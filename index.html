@@ -1,24 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, AlertTriangle, TrendingDown, Plus, History, Download, Upload, Edit, Trash2, X } from 'lucide-react';
+import { Search, Package, AlertTriangle, TrendingDown, Plus, History, Download, Upload } from 'lucide-react';
 
-// Mock dataset
+// Mock dataset representing AUBO's inventory complexity
 const generateMockData = () => {
   return [
+    // Robots
     { id: 'R001', name: 'AUBO-i5 Robot', category: 'Robots', quantity: 12, minStock: 5, location: 'Warehouse A', lastUpdated: '2026-01-15', notes: 'Gen 2 model' },
     { id: 'R002', name: 'AUBO-i10 Robot', category: 'Robots', quantity: 8, minStock: 3, location: 'Warehouse A', lastUpdated: '2026-01-14', notes: 'Heavy payload' },
     { id: 'R003', name: 'AUBO-i3 Robot', category: 'Robots', quantity: 2, minStock: 5, location: 'Warehouse B', lastUpdated: '2026-01-10', notes: 'Compact model - LOW STOCK' },
+    
+    // Control Boxes
     { id: 'CB001', name: 'Control Box - Standard', category: 'Control Boxes', quantity: 15, minStock: 8, location: 'Warehouse A', lastUpdated: '2026-01-16', notes: 'Compatible with i5/i10' },
     { id: 'CB002', name: 'Control Box - Compact', category: 'Control Boxes', quantity: 6, minStock: 4, location: 'Warehouse B', lastUpdated: '2026-01-12', notes: 'For i3 models' },
+    
+    // Motherboards
     { id: 'MB001', name: 'Motherboard v2.1', category: 'Spare Parts', quantity: 25, minStock: 10, location: 'Parts Room A', lastUpdated: '2026-01-17', notes: 'Latest version' },
     { id: 'MB002', name: 'Motherboard v1.8', category: 'Spare Parts', quantity: 8, minStock: 5, location: 'Parts Room A', lastUpdated: '2026-01-11', notes: 'Legacy - for older robots' },
     { id: 'MB003', name: 'Motherboard v2.0', category: 'Spare Parts', quantity: 18, minStock: 10, location: 'Parts Room A', lastUpdated: '2026-01-16', notes: 'Standard version' },
+    
+    // I/O Boards
     { id: 'IO001', name: 'I/O Board - 16 Channel', category: 'Spare Parts', quantity: 30, minStock: 15, location: 'Parts Room B', lastUpdated: '2026-01-15', notes: 'Standard I/O' },
     { id: 'IO002', name: 'I/O Board - 32 Channel', category: 'Spare Parts', quantity: 12, minStock: 8, location: 'Parts Room B', lastUpdated: '2026-01-13', notes: 'High-density I/O' },
+    
+    // Interface Boards
     { id: 'IF001', name: 'Interface Board Gen1', category: 'Spare Parts', quantity: 4, minStock: 8, location: 'Parts Room C', lastUpdated: '2026-01-09', notes: 'Compatible with v1.x robots - LOW STOCK' },
     { id: 'IF002', name: 'Interface Board Gen2', category: 'Spare Parts', quantity: 22, minStock: 10, location: 'Parts Room C', lastUpdated: '2026-01-17', notes: 'Compatible with v2.x robots' },
     { id: 'IF003', name: 'Interface Board Universal', category: 'Spare Parts', quantity: 15, minStock: 12, location: 'Parts Room C', lastUpdated: '2026-01-16', notes: 'Works with all models' },
+    
+    // RAM
     { id: 'RAM001', name: 'RAM 4GB DDR4', category: 'Spare Parts', quantity: 45, minStock: 20, location: 'Parts Room D', lastUpdated: '2026-01-17', notes: 'Standard memory' },
     { id: 'RAM002', name: 'RAM 8GB DDR4', category: 'Spare Parts', quantity: 28, minStock: 15, location: 'Parts Room D', lastUpdated: '2026-01-16', notes: 'High-performance' },
+    
+    // Additional varied parts
     { id: 'PS001', name: 'Power Supply 24V 10A', category: 'Spare Parts', quantity: 20, minStock: 10, location: 'Parts Room E', lastUpdated: '2026-01-15', notes: 'Standard PSU' },
     { id: 'PS002', name: 'Power Supply 24V 15A', category: 'Spare Parts', quantity: 3, minStock: 6, location: 'Parts Room E', lastUpdated: '2026-01-10', notes: 'Heavy-duty - LOW STOCK' },
     { id: 'CAB001', name: 'Cable Set - Standard', category: 'Spare Parts', quantity: 50, minStock: 25, location: 'Parts Room F', lastUpdated: '2026-01-17', notes: '3m length' },
@@ -33,61 +46,70 @@ const InventorySystem = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showLowStock, setShowLowStock] = useState(false);
   const [activityLog, setActivityLog] = useState([]);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [updateQuantity, setUpdateQuantity] = useState('');
   const [updateAction, setUpdateAction] = useState('received');
   const [updateNotes, setUpdateNotes] = useState('');
-  const [importText, setImportText] = useState('');
-  
-  // New item form state
-  const [newItem, setNewItem] = useState({
-    id: '',
-    name: '',
-    category: '',
-    quantity: '',
-    minStock: '',
-    location: '',
-    notes: ''
-  });
 
+  // Initialize inventory from storage or mock data
   useEffect(() => {
-    const stored = localStorage.getItem('aubo-inventory');
-    const storedLog = localStorage.getItem('aubo-activity-log');
-    
-    if (stored) {
-      setInventory(JSON.parse(stored));
-    } else {
-      const mockData = generateMockData();
-      setInventory(mockData);
-      localStorage.setItem('aubo-inventory', JSON.stringify(mockData));
-    }
+    const loadInventory = async () => {
+      try {
+        const stored = await window.storage.get('aubo-inventory');
+        if (stored && stored.value) {
+          setInventory(JSON.parse(stored.value));
+        } else {
+          const mockData = generateMockData();
+          setInventory(mockData);
+          await window.storage.set('aubo-inventory', JSON.stringify(mockData));
+        }
+      } catch (error) {
+        const mockData = generateMockData();
+        setInventory(mockData);
+      }
+    };
 
-    if (storedLog) {
-      setActivityLog(JSON.parse(storedLog));
-    }
+    const loadActivityLog = async () => {
+      try {
+        const stored = await window.storage.get('aubo-activity-log');
+        if (stored && stored.value) {
+          setActivityLog(JSON.parse(stored.value));
+        }
+      } catch (error) {
+        setActivityLog([]);
+      }
+    };
+
+    loadInventory();
+    loadActivityLog();
   }, []);
 
+  // AI-powered search with fuzzy matching
   useEffect(() => {
     let results = inventory;
 
+    // Filter by category
     if (selectedCategory !== 'All') {
       results = results.filter(item => item.category === selectedCategory);
     }
 
+    // Filter by low stock
     if (showLowStock) {
       results = results.filter(item => item.quantity < item.minStock);
     }
 
+    // AI-powered search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(item => {
+        // Exact matches
         if (item.id.toLowerCase().includes(term)) return true;
         if (item.name.toLowerCase().includes(term)) return true;
         if (item.notes.toLowerCase().includes(term)) return true;
         
+        // Fuzzy matching for common variations
         const fuzzyTerms = {
           'motherboard': ['mb', 'mobo', 'mother board'],
           'interface': ['if', 'interface board'],
@@ -113,7 +135,7 @@ const InventorySystem = () => {
   const categories = ['All', ...new Set(inventory.map(item => item.category))];
   const lowStockCount = inventory.filter(item => item.quantity < item.minStock).length;
 
-  const addActivityLog = (action, item, details) => {
+  const addActivityLog = async (action, item, details) => {
     const newLog = {
       timestamp: new Date().toISOString(),
       action,
@@ -121,12 +143,16 @@ const InventorySystem = () => {
       itemName: item.name,
       details
     };
-    const updatedLog = [newLog, ...activityLog].slice(0, 50);
+    const updatedLog = [newLog, ...activityLog].slice(0, 50); // Keep last 50 entries
     setActivityLog(updatedLog);
-    localStorage.setItem('aubo-activity-log', JSON.stringify(updatedLog));
+    try {
+      await window.storage.set('aubo-activity-log', JSON.stringify(updatedLog));
+    } catch (error) {
+      console.error('Failed to save activity log:', error);
+    }
   };
 
-  const updateInventoryItem = (itemId, quantityChange, action, notes) => {
+  const updateInventoryItem = async (itemId, quantityChange, action, notes) => {
     const updatedInventory = inventory.map(item => {
       if (item.id === itemId) {
         const newQuantity = item.quantity + quantityChange;
@@ -140,10 +166,14 @@ const InventorySystem = () => {
     });
 
     setInventory(updatedInventory);
-    localStorage.setItem('aubo-inventory', JSON.stringify(updatedInventory));
+    try {
+      await window.storage.set('aubo-inventory', JSON.stringify(updatedInventory));
+    } catch (error) {
+      console.error('Failed to save inventory:', error);
+    }
 
     const item = inventory.find(i => i.id === itemId);
-    addActivityLog(action, item, `${quantityChange > 0 ? '+' : ''}${quantityChange} units. ${notes || ''}`);
+    await addActivityLog(action, item, `${quantityChange > 0 ? '+' : ''}${quantityChange} units. ${notes || ''}`);
   };
 
   const handleUpdateSubmit = () => {
@@ -156,53 +186,6 @@ const InventorySystem = () => {
     setSelectedItem(null);
     setUpdateQuantity('');
     setUpdateNotes('');
-  };
-
-  const handleAddItem = () => {
-    if (!newItem.id || !newItem.name || !newItem.category || newItem.quantity === '' || newItem.minStock === '') {
-      alert('Please fill in all required fields (ID, Name, Category, Quantity, Min Stock)');
-      return;
-    }
-
-    // Check for duplicate ID
-    if (inventory.some(item => item.id === newItem.id)) {
-      alert('Item ID already exists. Please use a unique ID.');
-      return;
-    }
-
-    const itemToAdd = {
-      ...newItem,
-      quantity: parseInt(newItem.quantity),
-      minStock: parseInt(newItem.minStock),
-      lastUpdated: new Date().toISOString().split('T')[0]
-    };
-
-    const updatedInventory = [...inventory, itemToAdd];
-    setInventory(updatedInventory);
-    localStorage.setItem('aubo-inventory', JSON.stringify(updatedInventory));
-
-    addActivityLog('added', itemToAdd, `New item added to inventory`);
-
-    // Reset form
-    setNewItem({
-      id: '',
-      name: '',
-      category: '',
-      quantity: '',
-      minStock: '',
-      location: '',
-      notes: ''
-    });
-    setShowAddModal(false);
-  };
-
-  const handleDeleteItem = (item) => {
-    if (window.confirm(`Are you sure you want to delete ${item.name} (${item.id})?`)) {
-      const updatedInventory = inventory.filter(i => i.id !== item.id);
-      setInventory(updatedInventory);
-      localStorage.setItem('aubo-inventory', JSON.stringify(updatedInventory));
-      addActivityLog('deleted', item, `Item removed from inventory`);
-    }
   };
 
   const exportData = () => {
@@ -224,66 +207,16 @@ const InventorySystem = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => {
-    try {
-      const lines = importText.trim().split('\n');
-      if (lines.length < 2) {
-        alert('CSV must have at least a header row and one data row');
-        return;
-      }
-
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-      const requiredHeaders = ['ID', 'Name', 'Category', 'Quantity', 'Min Stock'];
-      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-      
-      if (missingHeaders.length > 0) {
-        alert(`Missing required columns: ${missingHeaders.join(', ')}`);
-        return;
-      }
-
-      const newItems = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-        const item = {
-          id: values[headers.indexOf('ID')] || '',
-          name: values[headers.indexOf('Name')] || '',
-          category: values[headers.indexOf('Category')] || '',
-          quantity: parseInt(values[headers.indexOf('Quantity')]) || 0,
-          minStock: parseInt(values[headers.indexOf('Min Stock')]) || 0,
-          location: values[headers.indexOf('Location')] || '',
-          lastUpdated: values[headers.indexOf('Last Updated')] || new Date().toISOString().split('T')[0],
-          notes: values[headers.indexOf('Notes')] || ''
-        };
-
-        if (item.id && item.name) {
-          newItems.push(item);
-        }
-      }
-
-      if (newItems.length === 0) {
-        alert('No valid items found in CSV');
-        return;
-      }
-
-      const updatedInventory = [...inventory, ...newItems];
-      setInventory(updatedInventory);
-      localStorage.setItem('aubo-inventory', JSON.stringify(updatedInventory));
-
-      alert(`Successfully imported ${newItems.length} items`);
-      setImportText('');
-      setShowImportModal(false);
-    } catch (error) {
-      alert('Error importing CSV. Please check the format and try again.');
-      console.error(error);
-    }
-  };
-
-  const resetDemo = () => {
+  const resetDemo = async () => {
     const mockData = generateMockData();
     setInventory(mockData);
     setActivityLog([]);
-    localStorage.setItem('aubo-inventory', JSON.stringify(mockData));
-    localStorage.setItem('aubo-activity-log', JSON.stringify([]));
+    try {
+      await window.storage.set('aubo-inventory', JSON.stringify(mockData));
+      await window.storage.set('aubo-activity-log', JSON.stringify([]));
+    } catch (error) {
+      console.error('Failed to reset demo:', error);
+    }
   };
 
   return (
@@ -291,20 +224,12 @@ const InventorySystem = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+          <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-slate-900">AUBO Inventory System</h1>
               <p className="text-slate-600 mt-1">Real-time inventory tracking and management</p>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
-                <Plus size={18} />
-                Add Item
-              </button>
-              <button onClick={() => setShowImportModal(true)} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-                <Upload size={18} />
-                Import CSV
-              </button>
+            <div className="flex gap-2">
               <button onClick={exportData} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                 <Download size={18} />
                 Export CSV
@@ -323,7 +248,7 @@ const InventorySystem = () => {
                   <p className="text-sm text-blue-600 font-medium">Total Items</p>
                   <p className="text-2xl font-bold text-blue-900">{inventory.length}</p>
                 </div>
-                <Package size={32} className="text-blue-400" />
+                <Package className="text-blue-400" size={32} />
               </div>
             </div>
             <div className="bg-red-50 p-4 rounded-lg">
@@ -332,7 +257,7 @@ const InventorySystem = () => {
                   <p className="text-sm text-red-600 font-medium">Low Stock Alerts</p>
                   <p className="text-2xl font-bold text-red-900">{lowStockCount}</p>
                 </div>
-                <AlertTriangle size={32} className="text-red-400" />
+                <AlertTriangle className="text-red-400" size={32} />
               </div>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
@@ -341,7 +266,7 @@ const InventorySystem = () => {
                   <p className="text-sm text-green-600 font-medium">Categories</p>
                   <p className="text-2xl font-bold text-green-900">{categories.length - 1}</p>
                 </div>
-                <TrendingDown size={32} className="text-green-400" />
+                <TrendingDown className="text-green-400" size={32} />
               </div>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
@@ -350,7 +275,7 @@ const InventorySystem = () => {
                   <p className="text-sm text-purple-600 font-medium">Recent Updates</p>
                   <p className="text-2xl font-bold text-purple-900">{activityLog.length}</p>
                 </div>
-                <History size={32} className="text-purple-400" />
+                <History className="text-purple-400" size={32} />
               </div>
             </div>
           </div>
@@ -380,7 +305,7 @@ const InventorySystem = () => {
             </select>
             <button
               onClick={() => setShowLowStock(!showLowStock)}
-              className={`px-6 py-3 rounded-lg font-medium transition whitespace-nowrap ${
+              className={`px-6 py-3 rounded-lg font-medium transition ${
                 showLowStock 
                   ? 'bg-red-600 text-white' 
                   : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
@@ -441,23 +366,15 @@ const InventorySystem = () => {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setSelectedItem(item);
-                              setShowUpdateModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            Update
-                          </button>
-                          <button
-                            onClick={() => handleDeleteItem(item)}
-                            className="text-red-600 hover:text-red-800 font-medium"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedItem(item);
+                            setShowUpdateModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Update
+                        </button>
                       </td>
                     </tr>
                   );
@@ -501,172 +418,10 @@ const InventorySystem = () => {
           </div>
         </div>
 
-        {/* Add Item Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-900">Add New Item</h3>
-                <button onClick={() => setShowAddModal(false)} className="text-slate-500 hover:text-slate-700">
-                  <X size={24} />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">ID *</label>
-                  <input
-                    type="text"
-                    value={newItem.id}
-                    onChange={(e) => setNewItem({...newItem, id: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., R004"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Name *</label>
-                  <input
-                    type="text"
-                    value={newItem.name}
-                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., AUBO-i7 Robot"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Category *</label>
-                  <input
-                    type="text"
-                    value={newItem.category}
-                    onChange={(e) => setNewItem({...newItem, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Robots, Spare Parts"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={newItem.location}
-                    onChange={(e) => setNewItem({...newItem, location: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Warehouse A"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Quantity *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newItem.quantity}
-                    onChange={(e) => setNewItem({...newItem, quantity: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., 10"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Min Stock *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newItem.minStock}
-                    onChange={(e) => setNewItem({...newItem, minStock: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., 5"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-                  <textarea
-                    value={newItem.notes}
-                    onChange={(e) => setNewItem({...newItem, notes: e.target.value})}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    rows="2"
-                    placeholder="e.g., Latest model with enhanced features"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={handleAddItem}
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
-                >
-                  Add Item
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setNewItem({
-                      id: '',
-                      name: '',
-                      category: '',
-                      quantity: '',
-                      minStock: '',
-                      location: '',
-                      notes: ''
-                    });
-                  }}
-                  className="flex-1 bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Import CSV Modal */}
-        {showImportModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-900">Import CSV Data</h3>
-                <button onClick={() => setShowImportModal(false)} className="text-slate-500 hover:text-slate-700">
-                  <X size={24} />
-                </button>
-              </div>
-              <div className="mb-4">
-                <p className="text-sm text-slate-600 mb-2">
-                  Paste your CSV data below. Required columns: ID, Name, Category, Quantity, Min Stock
-                </p>
-                <p className="text-xs text-slate-500 mb-3">
-                  Example format:<br/>
-                  ID,Name,Category,Quantity,Min Stock,Location,Last Updated,Notes<br/>
-                  R004,AUBO-i7 Robot,Robots,5,3,Warehouse C,2026-01-18,New model
-                </p>
-                <textarea
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                  rows="10"
-                  placeholder="Paste CSV data here..."
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleImport}
-                  disabled={!importText.trim()}
-                  className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition"
-                >
-                  Import Data
-                </button>
-                <button
-                  onClick={() => {
-                    setShowImportModal(false);
-                    setImportText('');
-                  }}
-                  className="flex-1 bg-slate-200 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-300 transition"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Update Modal */}
         {showUpdateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-xl font-bold text-slate-900 mb-4">Update Inventory</h3>
               <div className="space-y-4">
                 <div>
